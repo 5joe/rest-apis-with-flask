@@ -4,6 +4,7 @@ from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from sqlalchemy.exc import SQLAlchemyError
 
+
 from db import db
 from schemas import ItemSchema, ItemUpdateSchema
 from models import ItemModel
@@ -14,38 +15,37 @@ blp = Blueprint("Items", "items", description="Operation on items")
 class Item(MethodView):
     @blp.response(200, ItemSchema)
     def get(self, item_id):
-        try:
-            return items[item_id]
-        except KeyError:
-            abort(404, message="Item not Found.")
+        item = ItemModel.query.get_or_404(item_id)
+        return item
 
     def delete(self, item_id):
-        try:
-            del items[item_id]
-            return {"message": "Item deleted."}
-        except KeyError:
-            abort(404, message="Item not Found.")
+        item = ItemModel.query.get_or_404(item_id)
+        raise NotImplementedError("Deleting an item is not implemented.")
 
+    
     @blp.arguments(ItemUpdateSchema)
     @blp.response(200, ItemSchema)
     def put(self, item_data, item_id):
+        item = ItemModel.query.get(item_id)
+        if item:
+            item.price = item_data["price"]
+            item.name = item_data["name"]
 
-        try:
-            item = items[item_id]
+        else:
+            item = ItemModel(id=item_id, **item_data)
 
-            #https://blog.teclado.com/python-dictionary-merge-update-operators/
-            item |= item_data
 
-            return item
-        except KeyError:
-            abort(404, message="Item not found.")
+        db.session.add(item)
+        db.session.commit()
+
+        return item
 
 
 @blp.route("/item")
 class ItemList(MethodView):
     @blp.response(200, ItemSchema(many=True))
     def get(self):
-        return items.values() # note that the  kind of value that is returned is different here
+        return ItemModel.query.all()
 
     @blp.arguments(ItemSchema)
     @blp.response(201, ItemSchema)
